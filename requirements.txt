@@ -1,7 +1,13 @@
+# Build tools (must be first!)
+pip>=25.3
+setuptools>=68.0.0
+wheel>=0.41.0
+
+# Web framework
 Flask==3.0.0
 flask-cors==4.0.0
 
-# Machine Learning and NLP
+# Machine Learning / NLP
 transformers==4.35.0
 torch==2.10.0
 sentencepiece==0.1.99
@@ -11,7 +17,7 @@ protobuf==4.25.0
 textstat==0.7.3
 nltk==3.8.1
 
-# HTTP requests for fact-checking
+# HTTP requests
 requests==2.31.0
 
 # Utilities
