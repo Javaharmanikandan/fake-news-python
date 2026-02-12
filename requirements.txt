@@ -3,10 +3,9 @@ flask-cors==4.0.0
 numpy>=1.26.0
 requests==2.31.0
 
-# Machine Learning and NLP - Python 3.13 compatible
+# Machine Learning and NLP - Pre-built wheels only for Python 3.13
 torch==2.5.1
 transformers==4.40.0
-sentencepiece==0.1.99
 protobuf==4.25.0
 
 # Text Analysis
