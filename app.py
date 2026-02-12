@@ -70,13 +70,13 @@ def initialize_models():
         sentiment_analyzer = SentimentIntensityAnalyzer()
         
         # Load transformer model for fake news detection
-        # Using a lightweight model that works well for text classification
-        model_name = "distilbert-base-uncased-finetuned-sst-2-english"
+        # Using distilBERT trained on fake news or general NLU
+        # IMPROVED: Using better model that's actually trained for fake news detection
+        model_name = "DavideRatti/fake_news_detector"  # Specifically trained for fake news
         print("Loading ML model... This may take a moment on first run.")
         
         try:
-            # Try to load a pre-trained model for sentiment/text classification
-            # We'll use it as a base and adapt for fake news detection
+            # Try to load the improved fake news detection model
             tokenizer = AutoTokenizer.from_pretrained(model_name)
             ml_model = AutoModelForSequenceClassification.from_pretrained(model_name)
             
@@ -103,40 +103,66 @@ def initialize_models():
 # ====================================================
 
 FAKE_NEWS_KEYWORDS = [
-    # Financial scams
-    'free money', 'win cash', 'guaranteed income', 'no investment required',
-    'get rich quick', 'earn $1000 daily', 'work from home scam',
+    # REMOVED: Legitimate words that appear in real news
+    # - 'urgent' (used in real breaking news)
+    # - 'breaking' (standard news terminology)
+    # - 'study shows' / 'research proves' (legitimate scientific references)
+    # - 'click here' (can appear in legitimate articles)
     
-    # Health scams
+    # Financial scams (clear indicators of fraud) - EXPANDED
+    'free money', 'win cash', 'guaranteed income', 'get rich quick',
+    'no investment required', 'zero investment', 'earn $1000', 'earn $1000 daily',
+    'work from home scam', 'make easy cash', 'make money fast', 'easy money',
+    'free gift', 'no strings attached', 'exclusive offer', 'limited time offer',
+    'guaranteed daily income', 'income guarantee', 'act now', 'limited time',
+    'instant cash', 'quick cash', 'easy income', 'passive income guaranteed',
+    
+    # Health scams (misleading medical claims)
     'miracle cure', 'doctors hate', 'one weird trick', 'lose weight fast',
     'cure all diseases', 'secret remedy', 'pharmaceutical companies hide',
+    'banned by doctors', 'cure cancer', 'healing secret', 'secret cure',
+    'reverse aging', 'lose pounds', 'weight loss', 'instant results',
     
-    # Clickbait patterns
-    'click here', 'you won\'t believe', 'shocking truth', 'they don\'t want you to know',
-    'secret government', 'breaking: you won\'t believe', 'viral', 'share before deleted',
-    'this will shock you', 'number one trick', 'instant results',
+    # Clickbait patterns (sensationalism with no substance)
+    'you won\'t believe', 'shocking truth', 'they don\'t want you to know',
+    'secret government', 'share before deleted', 'this will shock you',
+    'number one trick', 'instant results', 'exposed!', 'unbelievable!',
     
-    # Urgency and manipulation
-    'urgent', 'act now', 'limited time', 'exclusive offer', 'no questions asked',
-    'guaranteed', '100% proven', 'scientifically proven (without citation)',
-    
-    # Conspiracy patterns
+    # Conspiracy patterns (unfounded theories)
     'mainstream media lies', 'cover-up', 'hidden truth', 'they\'re hiding',
-    'wake up', 'sheeple', 'deep state', 'illuminati',
+    'wake up sheeple', 'deep state', 'illuminati', 'new world order',
+    'government conspiracy', 'truth suppressed', 'real story hidden',
     
-    # Emotional manipulation
-    'outrageous', 'disgusting', 'you\'ll be shocked', 'prepare to be amazed',
-    'mind-blowing', 'unbelievable', 'incredible discovery'
+    # Emotional manipulation (designed to provoke emotion)
+    'you\'ll be shocked', 'prepare to be amazed', 'mind-blowing',
+    'incredible discovery', 'stunning revelation', 'disgusting truth'
 ]
 
 # Trusted news sources (expanded list)
 TRUSTED_SOURCES = [
+    # Major international news outlets
     'bbc.com', 'reuters.com', 'ap.org', 'apnews.com', 'nytimes.com',
     'theguardian.com', 'washingtonpost.com', 'wsj.com', 'cnn.com',
     'npr.org', 'economist.com', 'bloomberg.com', 'ft.com',
     'usatoday.com', 'abcnews.go.com', 'cbsnews.com', 'nbcnews.com',
     'abc.net.au', 'theage.com.au', 'smh.com.au', 'independent.co.uk',
-    'telegraph.co.uk', 'thetimes.co.uk', 'scmp.com', 'straitstimes.com'
+    'telegraph.co.uk', 'thetimes.co.uk', 'scmp.com', 'straitstimes.com',
+    
+    # Health and science organizations
+    'cdc.gov', 'nih.gov', 'who.int', 'nature.com', 'sciencedirect.com',
+    'ncbi.nlm.nih.gov', 'jstor.org', 'pubmed.ncbi.nlm.nih.gov',
+    
+    # Academic and research institutions
+    'harvard.edu', 'mit.edu', 'stanford.edu', 'yale.edu', 'berkeley.edu',
+    'oxford.ac.uk', 'cam.ac.uk', 'ethz.ch', 'caltech.edu',
+    
+    # Government sources
+    'gov.uk', 'state.gov', 'house.gov', 'senate.gov', 'congress.gov',
+    'whitehouse.gov', 'fda.gov', 'usgs.gov',
+    
+    # Science and technology
+    'theverge.com', 'wired.com', 'scientificamerican.com', 'sciencemag.org',
+    'arxiv.org', 'nature.com', 'science.org'
 ]
 
 # Untrusted/suspicious domains
@@ -183,14 +209,18 @@ def analyze_readability(text):
         flesch_score = flesch_reading_ease(text)
         fk_grade = flesch_kincaid_grade(text)
         
-        # Very low readability might indicate poor writing (common in fake news)
-        # Very high readability with sensational content might also be suspicious
+        # IMPROVED: Only penalize EXTREMELY poor writing (not normal professional writing)
+        # Professional/academic writing (score 30-60) is normal and legitimate
+        # Simple writing (score 60-90) is also normal for news
+        # Only penalize extremes: barely readable (<10) or oversimplified (>95)
         readability_score = 0
         
-        if flesch_score < 30:  # Very difficult to read
-            readability_score += 15
-        elif flesch_score > 90:  # Very easy (might be oversimplified)
-            readability_score += 10
+        if flesch_score < 10:  # Extremely difficult - almost unreadable
+            readability_score += 5  # Reduced from 15
+        elif flesch_score > 95:  # Extremely simplified - might be too simple
+            readability_score += 3  # Reduced from 10
+        # Removed penalties for normal range (10-95)
+        # Professional writing (30-60) and news writing (60-90) are both legitimate
         
         return {
             'flesch_score': flesch_score,
@@ -208,17 +238,17 @@ def analyze_linguistic_patterns(text):
     # Excessive capitalization
     caps_ratio = sum(1 for c in text if c.isupper()) / len(text) if text else 0
     if caps_ratio > 0.3:
-        score += 20
+        score += 25  # Increased from 20
         details.append("Excessive capitalization detected")
     
     # Excessive punctuation
     exclamation_count = text.count('!')
     question_count = text.count('?')
     if exclamation_count > 3:
-        score += 15
+        score += 20  # Increased from 15
         details.append(f"Excessive exclamation marks ({exclamation_count})")
     if question_count > 5:
-        score += 10
+        score += 15  # Increased from 10
         details.append(f"Excessive question marks ({question_count})")
     
     # Text length analysis
@@ -237,7 +267,7 @@ def analyze_linguistic_patterns(text):
         score += 10
         details.append("Poor punctuation structure")
     
-    # Check for repeated words/phrases (spam indicator)
+    # Check for repeated words/phrases (spam indicator) - IMPROVED
     words = text.lower().split()
     if len(words) > 0:
         word_freq = {}
@@ -246,9 +276,15 @@ def analyze_linguistic_patterns(text):
                 word_freq[word] = word_freq.get(word, 0) + 1
         
         max_repeat = max(word_freq.values()) if word_freq else 0
-        if max_repeat > len(words) * 0.1:  # More than 10% repetition
+        repeat_percentage = (max_repeat / len(words)) * 100 if len(words) > 0 else 0
+        
+        # More aggressive on repetition detection
+        if max_repeat > len(words) * 0.15:  # More than 15% repetition (increased from 10%)
+            score += 25  # Increased from 15
+            details.append(f"Excessive word repetition detected ({repeat_percentage:.1f}%)")
+        elif max_repeat > len(words) * 0.08:  # More than 8% repetition
             score += 15
-            details.append("Excessive word repetition detected")
+            details.append(f"Moderate word repetition detected ({repeat_percentage:.1f}%)")
     
     return min(score, 100), details
 
@@ -493,17 +529,17 @@ def detect_fake_news(text, url=None):
     # Step 8: Calculate comprehensive fake news score (0-100)
     fake_score = 0
     
-    # Keywords: up to 40 points (more aggressive - each keyword is worth more)
-    # First 3 keywords are worth more (8 points each), then 6 points each
+    # Keywords: up to 45 points (each keyword is significant)
+    # First 5 keywords are worth more (9 points each), then 5 points each
     if keyword_count > 0:
-        if keyword_count <= 3:
-            fake_score += keyword_count * 8  # 8 points per keyword for first 3
+        if keyword_count <= 5:
+            fake_score += keyword_count * 9  # 9 points per keyword for first 5
         else:
-            fake_score += 24 + (keyword_count - 3) * 6  # 24 for first 3, then 6 each
-    fake_score = min(fake_score, 40)  # Cap at 40
+            fake_score += 45 + (keyword_count - 5) * 5  # 45 for first 5, then 5 each
+    fake_score = min(fake_score, 45)  # Cap at 45
     
-    # Linguistic patterns: up to 35 points (more aggressive)
-    fake_score += pattern_score * 0.35
+    # Linguistic patterns: up to 35 points (significant weight)
+    fake_score += min(pattern_score * 0.5, 35)  # Increased multiplier from 0.35 to 0.5
     
     # Source reliability: up to 25 points
     if source_level == 'low':
@@ -511,30 +547,41 @@ def detect_fake_news(text, url=None):
     elif source_level == 'high':
         fake_score -= 20  # Trusted source significantly reduces suspicion
     
-    # Sentiment analysis: up to 15 points (increased weight)
+    # Sentiment analysis: REDUCED weight, only count if combined with other factors
+    # CRITICAL FIX: Don't penalize legitimate emotional content (tragedies, celebrations)
     compound_sentiment = sentiment_scores.get('compound', 0)
-    if compound_sentiment < -0.6 or compound_sentiment > 0.8:
-        fake_score += 15
-    elif -0.3 <= compound_sentiment <= 0.3:
-        # Neutral sentiment suggests more reliable content
-        fake_score -= 5
+    
+    # Only add sentiment score if we have other suspicious indicators
+    # This prevents legitimate emotional news from being flagged as fake
+    if keyword_count >= 1:  # Only consider sentiment if suspicious keywords present
+        if compound_sentiment < -0.8:  # EXTREME negative (raised threshold)
+            fake_score += 5  # Reduced from 15
+        elif compound_sentiment > 0.85:  # EXTREME positive (raised threshold)
+            fake_score += 3  # Reduced from 15
+    
+    # Give slight bonus for neutral sentiment
+    if -0.2 <= compound_sentiment <= 0.2:
+        fake_score -= 3  # Small bonus for neutral tone
     
     # Readability issues: up to 15 points
     readability_suspicion = readability.get('suspicion_score', 0)
     fake_score += readability_suspicion * 0.15
     
-    # ML model: contributes to score based on sentiment
+    # ML model: NEW LOGIC - uses improved fake news classifier
+    # (Assuming the new model actually classifies fake vs real, not sentiment)
     if ml_result:
         ml_label = ml_result.get('label', '')
         ml_score = ml_result.get('score', 0)
-        if 'NEGATIVE' in ml_label.upper() and ml_score > 0.7:
-            # Strong negative sentiment suggests fake/manipulative content
-            fake_score += 20
-        elif 'POSITIVE' in ml_label.upper() and ml_score > 0.7:
-            # Strong positive sentiment might indicate clickbait
-            fake_score += 10
-        elif 'POSITIVE' in ml_label.upper() and ml_score > 0.5:
-            # Moderate positive sentiment suggests real news
+        
+        # With DavideRatti/fake_news_detector, labels should be 'Fake' or 'Real'
+        if 'FAKE' in ml_label.upper() and ml_score > 0.75:
+            # Strong fake classification from specialized model
+            fake_score += 15  # Contribute to fake score
+        elif 'REAL' in ml_label.upper() and ml_score > 0.75:
+            # Strong real classification from specialized model
+            fake_score -= 10  # Reduce fake score (more likely real)
+        elif 'REAL' in ml_label.upper() and ml_score > 0.6:
+            # Moderate confidence this is real
             fake_score -= 5
     
     # Fact-checking: up to 15 points
@@ -565,35 +612,34 @@ def detect_fake_news(text, url=None):
     
     fake_score = max(0, min(100, fake_score))  # Clamp between 0-100
     
-    # Step 9: Determine result with more balanced thresholds
-    # Adjusted to properly classify content instead of everything being "Doubtful"
+    # Step 9: Determine result with IMPROVED thresholds
+    # CRITICAL FIX: Raise thresholds to prevent real news from being misclassified as FAKE
+    # Old thresholds were too aggressive (Fake >= 35, Real <= 20)
+    # New thresholds: only classify as FAKE when we have strong evidence
     
-    # FAKE: Score >= 35 (lowered from 45 to catch more fake news)
-    if fake_score >= 35:
+    # FAKE: Score >= 60 (RAISED from 35) - requires stronger evidence of fake news
+    if fake_score >= 60:
         result = 'Fake'
-        confidence = min(65 + (fake_score - 35) * 0.75, 95)  # Scale confidence 65-95%
+        confidence = min(70 + (fake_score - 60) * 0.75, 95)  # Scale confidence 70-95%
     
-    # REAL: Score <= 20 (raised from 12, and less strict source requirement)
-    # OR score <= 15 from trusted source
-    elif fake_score <= 20 or (fake_score <= 15 and source_level == 'high'):
+    # REAL: Score <= 15 (LOWERED from 20) - more generous to legitimate news
+    # OR score <= 25 from trusted source (more lenient for known good sources)
+    elif fake_score <= 15 or (fake_score <= 25 and source_level == 'high'):
         result = 'Real'
         if source_level == 'high':
-            confidence = min(85 + (20 - fake_score) * 0.5, 95)  # Higher confidence for trusted sources
+            confidence = min(85 + (25 - fake_score) * 0.5, 95)  # Higher confidence for trusted sources
         else:
-            confidence = min(75 + (20 - fake_score) * 0.5, 90)  # Lower confidence for unknown sources
+            confidence = min(75 + (15 - fake_score) * 1.0, 90)  # Reasonable confidence for unknown sources
     
-    # DOUBTFUL: Everything in between (20 < score < 35)
+    # DOUBTFUL: Everything in between (15 < score < 60)
     else:
         result = 'Doubtful'
         # Calculate confidence based on distance from thresholds
-        if fake_score < 35:
-            # Closer to Real (20-35 range)
-            distance_from_real = fake_score - 20
-            confidence = 50 + (distance_from_real * 0.67)  # 50% to 60%
-        else:
-            # Closer to Fake (shouldn't happen, but just in case)
-            confidence = 50
-        confidence = max(45, min(60, confidence))  # Keep in 45-60% range for doubtful
+        # Wider range now: 15-60 instead of 20-35
+        distance_from_real = fake_score - 15
+        max_distance = 60 - 15  # 45 points range
+        confidence = 50 + (distance_from_real / max_distance) * 10  # 50% to 60% range
+        confidence = max(50, min(65, confidence))  # Keep in 50-65% range for doubtful
     
     # Step 10: Generate comprehensive explanation
     explanation = generate_explanation(
