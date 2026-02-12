@@ -1,13 +1,13 @@
 Flask==3.0.0
 flask-cors==4.0.0
-numpy==1.24.3
+numpy>=1.26.0
 requests==2.31.0
 
-# Machine Learning and NLP - compatible versions
-torch==2.5.0+cpu
-transformers==4.36.2
+# Machine Learning and NLP - Python 3.13 compatible
+torch==2.5.1
+transformers==4.40.0
 sentencepiece==0.1.99
-protobuf==3.20.3
+protobuf==4.25.0
 
 # Text Analysis
 textstat==0.7.3
