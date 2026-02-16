@@ -11,3 +11,4 @@ protobuf==4.25.0
 # Text Analysis
 textstat==0.7.3
 nltk==3.8.1
+gunicorn==21.2.0

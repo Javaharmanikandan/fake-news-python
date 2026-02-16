@@ -721,7 +721,7 @@ if __name__ == '__main__':
     print("=" * 60)
     print("Starting Advanced Fake News Detection AI Service...")
     print("=" * 60)
-    
+
     # Initialize models
     if ML_AVAILABLE:
         print("Initializing ML models...")
@@ -729,8 +729,9 @@ if __name__ == '__main__':
     else:
         print("ML libraries not available. Using rule-based detection only.")
         print("To enable ML features, install: pip install transformers torch textstat nltk")
-    
-    print("Service will run on http://localhost:5000")
+
+    port = int(os.environ.get("PORT", 10000))  # 👈 IMPORTANT LINE
+    print(f"Service running on port {port}")
     print("=" * 60)
-    
-    app.run(host='0.0.0.0', port=5000, debug=True)
+
+    app.run(host='0.0.0.0', port=port)
